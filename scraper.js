@@ -97,7 +97,7 @@ export const scrape = async (start, end) => {
     }
 
     await browser.close();
-    
+
     console.log('Scraped ' + counter + ' records, from ' + start + ' to ' + end)
     console.log('Skipped ' + skip_counter + ' records')
     console.log('Saving data...')
