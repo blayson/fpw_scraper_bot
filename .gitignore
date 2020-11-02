@@ -1,3 +1,6 @@
 node_modules/
 .idea/
 .DS_Store
+images/
+fpw_data.json
+fpw_images.zip

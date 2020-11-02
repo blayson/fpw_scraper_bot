@@ -1,25 +1,41 @@
 import puppeteer from 'puppeteer';
+import fs from 'fs';
 
 import {splitAndPrepare} from './utils.js';
 import * as CONSTANTS from './constants.js';
 
 export const scrape = async (start, end) => {
-    const browser = await puppeteer.launch({headless: true});
-    const page = await browser.newPage();
-    console.log('Loading web page...')
+    const browser = await puppeteer.launch({
+        headless: true,
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+        // slowMo: 10,
+        defaultViewport: null,
+    });
 
-    await page.goto(CONSTANTS.URL);
-    await page.waitForTimeout(5000);
+    const page = await browser.newPage();
+
+    console.log('Loading web page...');
+
+    const userAgent =
+        "Mozilla/5.0 (X11; Linux x86_64)" +
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.39 Safari/537.36";
+    await page.setUserAgent(userAgent);
+    await page.goto(CONSTANTS.URL, {
+        waitUntil: "networkidle0",
+        timeout: 0
+    });
+    await page.waitForTimeout(3000);
+
     console.log('Web page loaded')
     console.log('Loading first record...')
 
     // Accept
     await page.click('#b0p0o3i0i0r1');
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(3000);
 
     // Go to first detailed record
     await page.click('#b0p1o11i0i0r1');
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(3000);
 
     if (start !== 1 && start !== undefined && start !== null) {
         await page.waitForSelector(CONSTANTS.SEARCH_RECORD_INPUT)
@@ -28,6 +44,7 @@ export const scrape = async (start, end) => {
         await page.keyboard.type(start.toString())
         await page.focus(CONSTANTS.FIRST_TAB)
     }
+
     console.log('First record loaded')
     console.log('Scraping...')
 
@@ -42,36 +59,47 @@ export const scrape = async (start, end) => {
 
         try {
             let pageResult = await parsePage(page)
+
             Object.assign(result, pageResult);
+
             counter++;
         } catch (e) {
             console.log('Some error occurred on a record: ' + i);
             console.log('Retrying record ' + i + ' ...');
+
+            if (CONSTANTS.DEBUG) console.log(e);
+
             try {
                 // go to first tab
                 await page.click(CONSTANTS.FIRST_TAB);
                 await page.waitForTimeout(CONSTANTS.TIMEOUT);
+
                 let pageResult = await parsePage(page)
+
                 Object.assign(result, pageResult);
+
                 counter++;
             } catch (e) {
                 console.log('Unable to scrape record ' + i)
                 console.log('Skipping...')
+
                 skip_counter++;
+
+                if (CONSTANTS.DEBUG) console.log(e);
             }
         }
 
         if (i !== end) {
-            // // go to next record page
+            // go to next record page
             await page.click(CONSTANTS.NEXT_RECORD);
             await page.waitForTimeout(CONSTANTS.TIMEOUT);
         }
     }
 
     await browser.close();
-    console.log('Scraped ' + counter + ' records, from ' + start + ' to ' + end)
-    console.log('Skipped ' + skip_counter + ' records')
-    console.log('Saving data...')
+    console.info('Scraped ' + counter + ' records, from ' + start + ' to ' + end)
+    console.info('Skipped ' + skip_counter + ' records')
+    console.info('Saving data...')
     return result;
 }
 
@@ -132,7 +160,6 @@ const parsePage = async (page) => {
     await page.waitForSelector('#b0p1o90i0i0r1 > div > div.text');
     await page.waitForSelector('#b0p1o92i0i0r1 > div > div.text');
 
-
     const thirdTabData = await page.evaluate(() => {
         let use = document.querySelector('#b0p1o88i0i0r1 > div > div.text').innerText;
         let cultivation = document.querySelector('#b0p1o90i0i0r1 > div > div.text').innerText;
@@ -146,7 +173,70 @@ const parsePage = async (page) => {
 
     thirdTabData.use = splitAndPrepare(thirdTabData.use, '.')
 
+    await page.click(CONSTANTS.PHOTOS_TAB)
+    try {
+        // get first image
+        const selector = "#b0p1o116i0i1r1 > div > div > img";
+        await page.waitForTimeout(CONSTANTS.TIMEOUT)
+        if (await page.$(selector) !== null) {
+            await page.click(selector);
+            await page.waitForSelector(CONSTANTS.IMAGE_SELECTOR);
+            await page.waitForTimeout(CONSTANTS.TIMEOUT)
+
+            // Get number of images for this record
+            const data = await page.$eval(CONSTANTS.NUMBER_OF_PHOTOS, el => el.innerText);
+            const numOfPhotos = data.trim().split('/', 1)
+
+            // Download images
+            for (let i = 1; i <= parseInt(numOfPhotos[0]); i++) {
+                // select image
+                await page.waitForSelector(CONSTANTS.IMAGE_SELECTOR);
+                await page.focus(CONSTANTS.IMAGE_SELECTOR);
+                await page.waitForTimeout(CONSTANTS.TIMEOUT)
+
+                // get image element
+                const imgElement = await page.$(CONSTANTS.IMAGE_SELECTOR);
+
+                // wait for loading
+                await page.waitForTimeout(CONSTANTS.TIMEOUT)
+
+                // check whether directory exists and take screenshot of image
+                let path = CONSTANTS.IMG_DIR + '/' + firstTabData.family + '/' + firstTabData.scientific_name;
+                if (fs.existsSync(path)) {
+                    await imgElement.screenshot({path: path + '/' + firstTabData.scientific_name + i + '.png'})
+                } else {
+                    fs.mkdirSync(path, {recursive: true});
+                    await imgElement.screenshot({path: path + '/' + firstTabData.scientific_name + i + '.png'})
+                }
+
+                // Next image
+                try {
+                    await page.waitForSelector("#b0p0o21i0i0r1");
+                    await page.click("#b0p0o21i0i0r1")
+                } catch (e) {
+                    if (CONSTANTS.DEBUG) console.log(e);
+                }
+            }
+
+            // Back to record
+            await page.waitForSelector("#b0p0o15i0i0r1")
+            await page.click("#b0p0o15i0i0r1")
+        }
+    } catch (e) {
+        console.log('No image found, skipping...');
+        if (CONSTANTS.DEBUG) console.log(e);
+
+        // try to return back
+        try {
+            await page.waitForSelector("#b0p0o15i0i0r1")
+            await page.click("#b0p0o15i0i0r1")
+        } catch (e) {
+            if (CONSTANTS.DEBUG) console.log(e);
+        }
+    }
+
     // Go to last tab
+    await page.waitForSelector(CONSTANTS.LAST_TAB)
     await page.click(CONSTANTS.LAST_TAB);
     await page.waitForSelector('#b0p1o77i0i0r1 > div > div.text');
     await page.waitForSelector('#b0p1o74i0i0r1 > div > div.text');

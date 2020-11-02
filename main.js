@@ -2,6 +2,7 @@
 import fs from "fs";
 import yargs from 'yargs';
 import {hideBin} from 'yargs/helpers';
+import archiver from 'archiver';
 
 import * as CONSTANTS from './constants.js';
 import {scrape} from './scraper.js';
@@ -43,6 +44,23 @@ scrape(argv.s, argv.e).then((value) => {
         if (err) {
             throw err;
         }
-        console.log("Data is saved to " + argv.f + ' file.');
+        console.log("Data is saved successfully to " + argv.f);
     });
+
+    let output = fs.createWriteStream('fpw_images.zip');
+    let archive = archiver('zip', {zlib: {level: 9}});
+
+    output.on('close', function() {
+        console.log('Images zipped successfully to fpw_images.zip');
+        console.log(archive.pointer() + ' total bytes.');
+    });
+
+    archive.on('error', function(err){
+        throw err;
+    });
+
+    archive.pipe(output);
+    archive.directory('images/', '.', null);
+
+    archive.finalize();
 });
