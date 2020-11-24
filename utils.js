@@ -47,7 +47,7 @@ export class Logger {
         });
         if (e !== null) {
             let full_e = '(' + getFullDate() + ') ' + e;
-            fs.writeFile('logs/log_' + this.date + '.txt', full_e + '\n', 'utf-8',(err) => {
+            fs.appendFile('logs/log_' + this.date + '.txt', full_e + '\n', 'utf-8',(err) => {
                 if (err) {
                     throw err;
                 }
