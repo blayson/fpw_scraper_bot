@@ -36,7 +36,9 @@ export class Logger {
 
     log(msg, e = null) {
         let full_msg = '(' + getFullDate() + ') ' + msg;
-
+        if (!fs.existsSync('logs/')) {
+            fs.mkdirSync('logs/');
+        }
         fs.appendFile('logs/log_' + this.date + '.txt', full_msg + '\n', 'utf-8',(err) => {
             if (err) {
                 throw err;

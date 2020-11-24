@@ -4,3 +4,5 @@ node_modules/
 images/
 fpw_data.json
 fpw_images.zip
+logs/
+out/

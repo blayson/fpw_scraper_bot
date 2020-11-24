@@ -45,6 +45,9 @@ const compressImages = async (fullDate, logger) => {
     if (fs.existsSync(zip_name)) {
         zip_name = 'fpw_images_' + fullDate + '(1).zip'
     }
+    if (!fs.existsSync('out/zips/')) {
+        fs.mkdirSync('out/zips/');
+    }
 
     let output = fs.createWriteStream('out/zips/' + zip_name);
     let archive = archiver('zip', {zlib: {level: 9}});
@@ -111,7 +114,9 @@ const launch = async (s, e) => {
             logger.log(j + ' - iteration scraped, saving');
             Object.assign(data, value);
             let jsonData = JSON.stringify(data);
-
+            if (!fs.existsSync('out/')) {
+                fs.mkdirSync('out/');
+            }
             fs.writeFile('out/' + fullDate + '_' + argv.f, jsonData, 'utf-8', (err) => {
                 if (err) {
                     throw err;
