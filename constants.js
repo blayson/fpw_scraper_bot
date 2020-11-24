@@ -16,3 +16,4 @@ export const FILE_TO_WRITE = "fpw_data.json"
 export const TIMEOUT = 1000
 export const IMG_DIR = './images'
 export const DEBUG = true
+export const GAP = 1000

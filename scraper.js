@@ -1,20 +1,14 @@
-import puppeteer from 'puppeteer';
 import fs from 'fs';
 
 import {splitAndPrepare} from './utils.js';
 import * as CONSTANTS from './constants.js';
 
-export const scrape = async (start, end) => {
-    const browser = await puppeteer.launch({
-        headless: true,
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
-        // slowMo: 10,
-        defaultViewport: null,
-    });
+
+export const scrape = async (start, end, browser, logger) => {
 
     const page = await browser.newPage();
 
-    console.log('Loading web page...');
+    logger.log('Loading web page...');
 
     const userAgent =
         "Mozilla/5.0 (X11; Linux x86_64)" +
@@ -26,8 +20,8 @@ export const scrape = async (start, end) => {
     });
     await page.waitForTimeout(3000);
 
-    console.log('Web page loaded')
-    console.log('Loading first record...')
+    logger.log('Web page loaded')
+    logger.log('Loading first record...')
 
     // Accept
     await page.click('#b0p0o3i0i0r1');
@@ -36,17 +30,20 @@ export const scrape = async (start, end) => {
     // Go to first detailed record
     await page.click('#b0p1o11i0i0r1');
     await page.waitForTimeout(3000);
+    logger.log('First record loaded')
 
+    // go to specified record to start
     if (start !== 1 && start !== undefined && start !== null) {
+        logger.log('Loading ' + start + ' record')
         await page.waitForSelector(CONSTANTS.SEARCH_RECORD_INPUT)
         await page.focus(CONSTANTS.SEARCH_RECORD_INPUT)
         await page.keyboard.press('Backspace');
         await page.keyboard.type(start.toString())
         await page.focus(CONSTANTS.FIRST_TAB)
+        logger.log(start + ' record loaded')
     }
 
-    console.log('First record loaded')
-    console.log('Scraping...')
+    logger.log('Scraping...')
 
     let result = {};
     let counter = 0;
@@ -58,34 +55,34 @@ export const scrape = async (start, end) => {
         await page.waitForTimeout(CONSTANTS.TIMEOUT);
 
         try {
-            let pageResult = await parsePage(page)
+            let pageResult = await parsePage(page, logger)
 
             Object.assign(result, pageResult);
 
             counter++;
         } catch (e) {
-            console.log('Some error occurred on a record: ' + i);
-            console.log('Retrying record ' + i + ' ...');
+            logger.log('Some error occurred on a record: ' + i);
+            logger.log('Retrying record ' + i + ' ...');
 
-            if (CONSTANTS.DEBUG) console.log(e);
+            logger.log(e);
 
             try {
                 // go to first tab
                 await page.click(CONSTANTS.FIRST_TAB);
                 await page.waitForTimeout(CONSTANTS.TIMEOUT);
 
-                let pageResult = await parsePage(page)
+                let pageResult = await parsePage(page, logger)
 
                 Object.assign(result, pageResult);
 
                 counter++;
             } catch (e) {
-                console.log('Unable to scrape record ' + i)
-                console.log('Skipping...')
+                logger.log('Unable to scrape record ' + i)
+                logger.log('Skipping...')
 
                 skip_counter++;
 
-                if (CONSTANTS.DEBUG) console.log(e);
+                logger.log(e);
             }
         }
 
@@ -96,16 +93,17 @@ export const scrape = async (start, end) => {
         }
     }
 
-    await browser.close();
 
-    console.log('Scraped ' + counter + ' records, from ' + start + ' to ' + end)
-    console.log('Skipped ' + skip_counter + ' records')
-    console.log('Saving data...')
+    logger.log('Scraped ' + counter + ' records, from ' + start + ' to ' + end)
+    logger.log('Skipped ' + skip_counter + ' records')
+    logger.log('Saving data...')
+
+    await browser.close();
 
     return result;
 }
 
-const parsePage = async (page) => {
+const parsePage = async (page, logger) => {
     await page.waitForSelector('#b0p1o9i0i0r1 > div > div.text');
 
     const firstTabData = await page.evaluate(() => {
@@ -216,7 +214,7 @@ const parsePage = async (page) => {
                     await page.waitForSelector("#b0p0o21i0i0r1");
                     await page.click("#b0p0o21i0i0r1")
                 } catch (e) {
-                    if (CONSTANTS.DEBUG) console.log(e);
+                    logger.log(e);
                 }
             }
 
@@ -225,21 +223,22 @@ const parsePage = async (page) => {
             await page.click("#b0p0o15i0i0r1")
         }
     } catch (e) {
-        console.log('No image found, skipping...');
-        if (CONSTANTS.DEBUG) console.log(e);
+        logger.log('No image found, skipping...');
+        logger.log(e);
 
         // try to return back
         try {
             await page.waitForSelector("#b0p0o15i0i0r1")
             await page.click("#b0p0o15i0i0r1")
         } catch (e) {
-            if (CONSTANTS.DEBUG) console.log(e);
+            logger.log(e);
         }
     }
 
     // Go to last tab
     await page.waitForSelector(CONSTANTS.LAST_TAB)
     await page.click(CONSTANTS.LAST_TAB);
+    await page.waitForTimeout(CONSTANTS.TIMEOUT);
     await page.waitForSelector('#b0p1o77i0i0r1 > div > div.text');
     await page.waitForSelector('#b0p1o74i0i0r1 > div > div.text');
 
