@@ -45,6 +45,11 @@ const compressImages = async (fullDate, logger) => {
     if (fs.existsSync(zip_name)) {
         zip_name = 'fpw_images_' + fullDate + '(1).zip'
     }
+
+    if (!fs.existsSync('out/')) {
+        fs.mkdirSync('out/');
+    }
+
     if (!fs.existsSync('out/zips/')) {
         fs.mkdirSync('out/zips/');
     }
