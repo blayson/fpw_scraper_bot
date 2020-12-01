@@ -4,9 +4,8 @@ import {splitAndPrepare} from './utils.js';
 import * as CONSTANTS from './constants.js';
 
 
-export const scrape = async (start, end, browser, logger) => {
+export const scrape = async (start, end, page, logger) => {
 
-    const page = await browser.newPage();
 
     logger.log('Loading web page...');
 
@@ -98,7 +97,6 @@ export const scrape = async (start, end, browser, logger) => {
     logger.log('Skipped ' + skip_counter + ' records')
     logger.log('Saving data...')
 
-    await browser.close();
 
     return result;
 }

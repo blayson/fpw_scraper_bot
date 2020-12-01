@@ -90,6 +90,7 @@ const launch = async (s, e) => {
             slowMo: 10,
             defaultViewport: null,
         });
+        const page = await browser.newPage();
 
         let first = s + (CONSTANTS.GAP * counter);
         if (counter !== 0) {
@@ -110,7 +111,7 @@ const launch = async (s, e) => {
         logger.log('Starting from ' + first + ' to ' + last);
         counter++;
 
-        await scrape(first, last, browser, logger).then((value) => {
+        await scrape(first, last, page, logger).then((value) => {
             logger.log(j + ' - iteration scraped, saving');
             Object.assign(data, value);
             let jsonData = JSON.stringify(data);
@@ -123,11 +124,15 @@ const launch = async (s, e) => {
                 }
                 logger.log("Data is saved successfully to " + fullDate + '_' + argv.f);
             });
-        })
+        });
+        await browser.close();
+
     }
 
     await compressImages(fullDate, logger);
 
 }
 
-await launch(argv.s, argv.e);
+launch(argv.s, argv.e).then(() => {
+    console.log('Done')
+});
